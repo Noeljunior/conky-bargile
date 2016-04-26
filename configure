@@ -1,0 +1,45 @@
+#!/bin/bash
+
+CONFDIR=$1
+USRDIR=$2
+HOMECONF=$3
+HOMETHEME=$4
+
+#echo "Config file at: $CONFDIR"
+#echo "Usr files at: $USRDIR"
+
+
+if [ -z "$CONFDIR" ] || [ -z "$USRDIR" ]; then
+    echo "One or more paths were not set."
+    exit
+fi
+
+if [ -z "$HOMECONF" ]; then
+    HOMECONF='os.getenv("HOME") .. "/.config/conky/conky-bargile.conf"'
+fi
+
+if [ -z "$HOMETHEME" ]; then
+    HOMETHEME='os.getenv("HOME") .. "/.config/conky/conky-bargile.lua"'
+fi
+
+# replace paths on the source
+#echo CONFDIR $CONFDIR
+#echo USRDIR $USRDIR
+#echo HOMECONF $HOMECONF
+#echo HOMETHEME $HOMETHEME
+
+function replace() {
+    FIND=$1
+    REPLACE=$2
+    FILE=$3
+    sed -i "/$FIND/c\\$REPLACE" "$FILE"
+}
+
+
+replace "conky --config " "conky --config '$CONFDIR/conky-bargile.conf'" "src/conky-bargile"
+replace "    lua_load = " "    lua_load = '$CONFDIR/conky-bargile.lua'," "src/conky-bargile.conf"
+replace "defaultfile = " "defaultfile = '$USRDIR/conky-bargile.lua.default'" "src/conky-bargile.lua"
+
+replace "homeconf = " "homeconf = $HOMECONF" "src/conky-bargile.conf"
+replace "homefile = " "homefile = $HOMETHEME" "src/conky-bargile.lua"
+

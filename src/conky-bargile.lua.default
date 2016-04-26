@@ -1,0 +1,720 @@
+--[[
+    Yet another conky-lua theme, this one includes some kind of an engine
+    Copyright (C) 2016  Tiago Levita
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>
+--]]
+
+--========================================================
+--=========================================== INIT WIDGETS
+--========================================================
+function bargile_init()
+    --------------------------------------------
+    --                          default template
+    --------------------------------------------
+    local defaulttemplate = {
+        -- postioning and sizing
+        posx        = 15,
+        posy        = 15,
+        radiuso     = 70,
+        radiusi     = 70 / 2,
+        sepx        = 10,
+        plotw       = 210,
+        ploth       = 35,
+        sepnic      = 10,
+        widgetsep   = 15,
+
+        -- colours and fonts
+        -- titles
+        --background  = {{0, bgh_hexa_rgba(0x000000, 0.5)}},
+        colortitle  = {bgh_hexa_rgba(0xbbcae5, 0.8)},
+        fonttitle   = {face = "ubuntu", size = 20, weight = bgh_bold()},
+        fonttitle2  = {face = "ubuntu", size = 14, weight = bgh_bold()},
+        colorload   = {bgh_hexa_rgba(0xbbcae5, 0.7)},
+        fontload    = {face = "ubuntu", size = 14, weight = bgh_bold()},
+        fontload2   = {face = "ubuntu", size = 12, weight = bgh_bold()},
+        fontload3   = {face = "ubuntu", size = 10, weight = bgh_bold()},
+        colorlbl    = {bgh_hexa_rgba(0xbbcae5, 0.8)},
+        fontlbl     = {face = "ubuntu", size = 12, weight = bgh_bold()},
+        fontlbl2    = {face = "ubuntu", size = 8, weight = bgh_bold()},
+        colorleg    = {bgh_hexa_rgba(0xbbcae5, 0.8)},
+        fontleg     = {face = "ubuntu", size = 8, weight = bgh_bold()},
+        -- system average load
+        colorsall   = {{0, bgh_hexa_rgba(0xbbcae5, 0.3)}, {1, bgh_hexa_rgba(0xbbcae5, 0.6)}},
+        colorsalt   = {{bgh_hexa_rgba(0xbbcae5, 0.6)}, {bgh_hexa_rgba(0xbbcae5, 0.9)}},
+        fontsal     = {size = 8},
+
+        -- plots
+        colorpbg    = {{0, bgh_hexa_rgba(0xffffff, 0.05)}},
+        colorpfill  = {{0, bgh_hexa_rgba(0x3d73da, 0.5)}, {1, bgh_hexa_rgba(0x3d73da, 1.0)}},
+        colorpline  = nil,
+        colorpsbg   = nil,
+        colorpsfill = {{0, bgh_hexa_rgba(0xaa0000, 0.5)}, {1, bgh_hexa_rgba(0xff0000, 0.5)}},
+        colorpsline = nil,
+
+        -- gauges
+        colorbg     = {bgh_hexa_rgba(0x778db6, 0.3)},
+        colorfg     = {bgh_hexa_rgba(0xbbcae5, 0.3)},
+        colorstip   = {{bgh_hexa_rgba(0x1b64f1, 0.7)}, {bgh_hexa_rgba(0xff0000, 0.8)}},
+        colorstxt   = {{bgh_hexa_rgba(0xBAD2FF, 0.7)}, {bgh_hexa_rgba(0xFFB5B5, 0.8)}},
+        font        = {size = 8},
+
+        -- tops
+        colortop    = {bgh_hexa_rgba(0xbbcae5, 0.7)},
+        fonttop     = {face = "monospace", size = 10},
+    }
+    local widgetheight = defaulttemplate.radiuso * 2 + defaulttemplate.widgetsep
+
+    --------------------------------------------
+    --                            create widgets
+    --------------------------------------------
+    -- a background
+    defaulttemplate.bgx = 0
+    defaulttemplate.bgy = 0
+    defaulttemplate.bgw = defaulttemplate.posy * 2 + defaulttemplate.radiuso +
+        defaulttemplate.sepx + defaulttemplate.plotw
+    defaulttemplate.bgh = defaulttemplate.posx * 2 + widgetheight * 3 +
+        3 * (defaulttemplate.sepnic + defaulttemplate.ploth) - defaulttemplate.sepnic
+    bgh_torender(bgw_background(defaulttemplate))
+
+    -- cpu widget
+    defaulttemplate.cpus    = bgh_cpus(bgh_nothreads()) -- auto detect #threads
+    defaulttemplate.sensors = bgh_lmsensors() -- auto detect temp sensors
+    bgh_torender(bgw_cpu(defaulttemplate))
+
+    -- mem widget
+    defaulttemplate.posy = defaulttemplate.posy + widgetheight
+    bgh_torender(bgw_ram(defaulttemplate))
+
+    -- io widget
+    defaulttemplate.posy     = defaulttemplate.posy + widgetheight
+    defaulttemplate.hddtemps, defaulttemplate.tnames = bgh_hddtemp_disks() -- auto detect hddtemp
+    defaulttemplate.disks, defaulttemplate.dnames = bgh_filesystems() -- auto detect filesystem
+    bgh_torender(bgw_io(defaulttemplate))
+
+    -- nics widget
+    defaulttemplate.posx = defaulttemplate.posx + defaulttemplate.radiuso + defaulttemplate.sepx
+    defaulttemplate.posy = defaulttemplate.posy + widgetheight
+    defaulttemplate.nics = bgh_nics()
+    bgh_torender(bgw_nics(defaulttemplate))
+
+    -- update interval
+    updateinterval = 1.0
+end
+
+--========================================================
+--================================ DO SOMETHING EVERY LOOP
+--========================================================
+function bargile_loop()
+    -- by default, the render will draw the objects added using bgh_torender()
+    --return true -- uncomment and the render will not draw the objects
+end
+
+
+--==============================================================================
+--==============================================================
+--============================================================== DEFAULT WIDGETS
+--==============================================================
+--==============================================================================
+
+--========================================================
+--==================================================== CPU
+--========================================================
+function bgw_cpu(opts)
+    local opts = opts or {}
+    local ros = {}
+
+    -- defaults
+    local posx    = opts.posx    or 15
+    local posy    = opts.posy    or 5
+
+    local radiuso = opts.radiuso or 70
+    local widtho  = opts.widtho
+    local iso     = opts.iso
+
+    local radiusi = opts.radiusi or radiuso / 2
+    local widthi  = opts.widdthi
+    local isi     = opts.isi
+
+    local sepx    = opts.sepx    or 10
+    local plotw   = opts.plotw   or 210
+    local ploth   = opts.ploth   or 35
+
+    local angles   = opts.angles   or bgh_rad(90)
+    local anglef   = opts.anglef   or angles + bgh_rad(180)
+    local widthtip = opts.widthtip or bgh_rad(5)
+
+    local maxaload = opts.maxaload or bgh_nothreads()
+    local salw     = opts.salw     or 30
+
+    -- colors and font
+    local colorbg   = opts.colorbg   or bgh_rgba_to_r_g_b_a({0x778db6, 0.30})
+    local colorfg   = opts.colorfg   or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.30})
+    local colorstip = opts.colorstip or {bgh_rgba_to_r_g_b_a({0x1b64f1, 0.70}), bgh_rgba_to_r_g_b_a({0xff0000, 0.80})}
+    local colorstxt = opts.colorstxt or {bgh_rgba_to_r_g_b_a({0xBAD2FF, 0.70}), bgh_rgba_to_r_g_b_a({0xFFB5B5, 0.80})}
+    local fontgauge = opts.fontgauge or {size = 8}
+
+    local colorpfill = opts.colorpfill
+    local colorpline = opts.colorpline
+    local colorpbg   = opts.colorpbg
+
+    local colorsall  = opts.colorsall
+    local colorsalt  = opts.colorsalt
+    local fontsal    = opts.fontsal  or {size = 8}
+
+    local colortitle = opts.colortitle or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fonttitle  = opts.fonttitle  or {face = "ubuntu", size = 20, weight = bgh_bold()}
+    local colorload  = opts.colorload  or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fontload   = opts.fontload   or {face = "ubuntu", size = 14, weight = bgh_bold()}
+
+    local colorlbl   = opts.colorlbl
+    local fontlbl    = opts.fontlbl  or {face = "ubuntu", size = 14, weight = bgh_bold()}
+
+    local colortop   = opts.colortop or {1, 1, 1, 0.5}
+    local fonttop    = opts.fonttop  or {face = "monospace", size = 10}
+
+    --================================================================= CPU LOAD
+    posx = posx + radiuso
+    posy = posy + radiuso
+
+    if opts.cpus == nil then
+        local nothreads = bgh_nothreads()
+        opts.cpus = {}
+        for i = 1, nothreads, 1 do
+            table.insert(opts.cpus, i)
+        end
+    end
+    local nothreads = #opts.cpus
+
+    if iso == nil or widtho == nil then
+        if nothreads > 8 then
+            iso = 0.8
+            widtho = 1
+        elseif nothreads > 4 then
+            iso = 0.8
+            widtho = 3
+        else
+            iso = 1
+            widtho = 6
+        end
+    end
+
+    local radius = radiuso - widtho / 2
+    local rinc = widtho + iso
+
+    for i, val in pairs(opts.cpus) do
+        local ro = bgh_ogauge:newarc(0, 100, posx, posy, radius - rinc * (i-1), angles, anglef, widtho, widthtip, colorbg, colorfg, colorstip, colorstxt, fontgauge)
+        ro._upfunc = function() local ce = bgh_conky("cpu cpu" .. val) return ce, ce end
+        table.insert(ros, ro)
+    end
+
+    --================================================================= CPU TEMP
+    opts.sensors = opts.sensors or bgh_lmsensors()
+    local nocores = #opts.sensors
+
+    if isi == nil or widthi == nil then
+        if nocores > 4 then
+            isi = 0.8
+            widthi = 1
+        elseif nocores > 2 then
+            isi = 0.8
+            widthi = 3
+        else
+            isi = 1
+            widthi = 6
+        end
+    end
+
+    local radius = radiusi - widthi / 2
+    local rinc = widthi + isi
+
+    for i, val in pairs(opts.sensors) do
+        local ro = bgh_ogauge:newarc(0, 105, posx, posy, radiusi - rinc * (i-1), angles, anglef, widthi, widthtip, colorbg, colorfg, colorstip, colorstxt, fontgauge)
+
+        ro._upfunc = function(conkyexec)
+            local ce = bgh_conky(conkyexec)
+            return ce, ce
+        end
+        ro._upparams = {"exec " .. bgh_lmsense(val)}
+
+        table.insert(ros, ro)
+    end
+
+    --============================================================ CPU LOAD PLOT
+    posx = posx + sepx
+    posy = posy - radiuso
+
+    local ro = bgh_oplot:new(nil, 100, plotw, ploth, posx, posy, colorpfill, colorpline, colorpbg, true, nil)
+    ro._upfunc = function() return bgh_conky("cpu") end
+    table.insert(ros, ro)
+
+    -- load average lines
+    local middle = posx + plotw / 2 + 5
+    local nw = middle - salw
+    local sal = bgh_oline:new(0, maxaload, nw - salw/2, posy, salw, ploth, 1, colorsall)
+    local salt = bgh_ogauge:newline(0, maxaload, nw, posy, nw, posy + ploth, 1, 5, nil, nil, nil, colorsalt, fontsal)
+    sal._upfunc = function() return bgh_conky("loadavg 1") end
+    salt._upfunc = function() local ce = bgh_conky("loadavg 1") return ce, ce end
+    table.insert(ros, sal)
+    table.insert(ros, salt)
+
+    local nw = middle
+    local sal = bgh_oline:new(0, maxaload, nw - salw/2, posy, salw, ploth, 1, colorsall)
+    local salt = bgh_ogauge:newline(0, maxaload, nw, posy, nw, posy + ploth, 1, 5, nil, nil, nil, colorsalt, fontsal)
+    sal._upfunc = function() return bgh_conky("loadavg 2") end
+    salt._upfunc = function() local ce = bgh_conky("loadavg 2") return ce, ce end
+    table.insert(ros, sal)
+    table.insert(ros, salt)
+
+    local nw = middle + salw
+    local sal = bgh_oline:new(0, maxaload, nw - salw/2, posy, salw, ploth, 1, colorsall)
+    local salt = bgh_ogauge:newline(0, maxaload, nw, posy, nw, posy + ploth, 1, 5, nil, nil, nil, colorsalt, fontsal)
+    sal._upfunc = function() return bgh_conky("loadavg 3") end
+    salt._upfunc = function() local ce = bgh_conky("loadavg 3") return ce, ce end
+    table.insert(ros, sal)
+    table.insert(ros, salt)
+
+    -- texts
+    local txt = bgh_otext:new("CPU", posx + 10, posy + ploth / 2, "lc", fonttitle, colortitle)
+    table.insert(ros, txt)
+
+    local txt = bgh_otext:new("", posx + plotw - 10, posy + ploth / 2, "rc", fontload, colorload)
+    txt._upfunc = function() return bgh_conky("cpu 0") .. "%" end
+    table.insert(ros, txt)
+
+    local txt = bgh_otext:new("°C", posx - sepx, posy + radiuso, "rc", fontlbl, colorlbl)
+    table.insert(ros, txt)
+
+    --================================================================== CPU TOP
+    posy = posy + radiuso * 2 - 11 * 9
+    bgh_tmerge(ros, bgw_conkytop("%21s %4s%% %4s", "top", {"name", "cpu", "mem_res"}, posx, posy, 11, 9, fonttop, colortop))
+
+    return ros
+end
+
+--========================================================
+--==================================================== RAM
+--========================================================
+function bgw_ram(opts)
+    local opts = opts or {}
+    local ros = {}
+
+    -- defaults
+    local posx    = opts.posx    or 15
+    local posy    = opts.posy    or 5 + 70*2 + 15
+
+    local radiuso = opts.radiuso or 70
+    local widtho  = opts.widtho  or 6
+    local iso     = opts.iso     or 1
+
+    local radiusi = opts.radiusi or radiuso / 2
+    local widthi  = opts.widdthi or 6
+    local isi     = opts.isi     or 1
+
+    local sepx    = opts.sepx    or 10
+    local plotw   = opts.plotw   or 210
+    local ploth   = opts.ploth   or 35
+
+    local angles   = opts.angles   or bgh_rad(90)
+    local anglef   = opts.anglef   or angles + bgh_rad(180)
+    local widthtip = opts.widthtip or bgh_rad(5)
+
+    -- colors and font
+    local colorbg   = opts.colorbg   or bgh_rgba_to_r_g_b_a({0x778db6, 0.30})
+    local colorfg   = opts.colorfg   or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.30})
+    local colorstip = opts.colorstip or {bgh_rgba_to_r_g_b_a({0x1b64f1, 0.70}), bgh_rgba_to_r_g_b_a({0xff0000, 0.80})}
+    local colorstxt = opts.colorstxt or {bgh_rgba_to_r_g_b_a({0xBAD2FF, 0.70}), bgh_rgba_to_r_g_b_a({0xFFB5B5, 0.80})}
+    local fontgauge = opts.fontgauge or {size = 8}
+
+    local colorpfill = opts.colorpfill
+    local colorpline = opts.colorpline
+    local colorpbg   = opts.colorpbg
+
+    local colorpsfill = opts.colorpsfill
+    local colorpsline = opts.colorpsline
+    local colorpsbg   = opts.colorpsbg
+
+    local colortitle = opts.colortitle or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fonttitle  = opts.fonttitle  or {face = "ubuntu", size = 20, weight = bgh_bold()}
+    local colorload  = opts.colorload  or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fontload2  = opts.fontload2  or {face = "ubuntu", size = 12, weight = bgh_bold()}
+
+    local colorlbl   = opts.colorlbl
+    local fontlbl2   = opts.fontlbl2  or {face = "ubuntu", size = 8, weight = bgh_bold()}
+
+    local colortop   = opts.colortop or {1, 1, 1, 0.5}
+    local fonttop    = opts.fonttop  or {face = "monospace", size = 10}
+
+    --================================================================ RAM USAGE
+    posx = posx + radiuso
+    posy = posy + radiuso
+
+    local radius = radiuso - widtho / 2
+    local rinc = widtho + iso
+
+    local ro = bgh_ogauge:newarc(0, 100, posx, posy, radius - rinc * (0), angles, anglef, widtho, widthtip, colorbg, colorfg, colorstip, colorstxt, fontgauge)
+    ro._upfunc = function() return bgh_conky("memperc"), bgh_conky("mem") end
+    table.insert(ros, ro)
+
+    --=============================================================== SWAP USAGE
+    local radius = radiusi - widthi / 2
+    local rinc = widthi + isi
+
+    local ro = bgh_ogauge:newarc(0, 100, posx, posy, radiusi - rinc * (0), angles, anglef, widthi, widthtip, colorbg, colorfg, colorstip, colorstxt, fontgauge)
+
+    ro._upfunc = function()
+        return bgh_conky("swapperc"), bgh_conky("swap")
+    end
+    ro._drawme = function()
+        if (bgh_htb(bgh_conky("swapmax")) > 0) then return true end
+        return false
+    end
+
+    table.insert(ros, ro)
+
+    --============================================================ RAM/SWAP PLOT
+    posx = posx + sepx
+    posy = posy - radiuso
+
+    -- RAM
+    local ro = bgh_oplot:new(nil, 100, plotw, ploth, posx, posy, colorpfill, colorpline, colorpbg, true, nil)
+    ro._upfunc = function() return bgh_conky("memperc") end
+    table.insert(ros, ro)
+
+    -- SWAP
+    local ro = bgh_oplot:new(nil, 100, plotw, ploth, posx, posy, colorpsfill, colorpsline, colorpsbg, true, nil)
+    ro._upfunc = function() return bgh_conky("swapperc") end
+    table.insert(ros, ro)
+
+    -- texts
+    local txt = bgh_otext:new("MEM", posx + 10, posy + ploth / 2, "lc", fonttitle, colortitle)
+    table.insert(ros, txt)
+
+    local txtr = bgh_otext:new("", posx + plotw - 10, posy + ploth / 4, "rc", fontload2, colorload)
+    local txtw = bgh_otext:new("", posx + plotw - 10, posy + ploth * 3 / 4, "rc", fontload2, colorload)
+    txtr._upfunc = function() return bgh_conky("mem") end
+    txtw._upfunc = function() return bgh_conky("swap") end
+    table.insert(ros, txtr)
+    table.insert(ros, txtw)
+
+    local txt = bgh_otext:new("SWAP", posx - sepx, posy + radiuso, "rc", fontlbl2, colorlbl)
+    txt._drawme = function()
+        if (bgh_htb(bgh_conky("swapmax")) > 0) then return true end
+        return false
+    end
+    table.insert(ros, txt)
+
+    --================================================================== CPU TOP
+    posy = posy + radiuso * 2 - 11 * 9
+    bgh_tmerge(ros, bgw_conkytop("%21s %4s%% %4s", "top_mem", {"name", "cpu", "mem_res"}, posx, posy, 11, 9, fonttop, colortop))
+
+    return ros
+end
+
+
+--========================================================
+--===================================================== IO
+--========================================================
+function bgw_io(opts)
+    local opts = opts or {}
+    local ros = {}
+
+    -- defaults
+    local posx    = opts.posx    or 15
+    local posy    = opts.posy    or 5 + (70*2+15) * 2
+
+    local radiuso = opts.radiuso or 70
+    local widtho  = opts.widtho  or 6
+    local iso     = opts.iso     or 1
+
+    local radiusi = opts.radiusi or radiuso / 2
+    local widthi  = opts.widdthi or 6
+    local isi     = opts.isi     or 1
+
+    local sepx    = opts.sepx    or 10
+    local plotw   = opts.plotw   or 210
+    local ploth   = opts.ploth   or 35
+
+    local angles   = opts.angles   or bgh_rad(90)
+    local anglef   = opts.anglef   or angles + bgh_rad(180)
+    local widthtip = opts.widthtip or bgh_rad(5)
+
+    -- colors and font
+    local colorbg   = opts.colorbg   or bgh_rgba_to_r_g_b_a({0x778db6, 0.30})
+    local colorfg   = opts.colorfg   or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.30})
+    local colorstip = opts.colorstip or {bgh_rgba_to_r_g_b_a({0x1b64f1, 0.70}), bgh_rgba_to_r_g_b_a({0xff0000, 0.80})}
+    local colorstxt = opts.colorstxt or {bgh_rgba_to_r_g_b_a({0xBAD2FF, 0.70}), bgh_rgba_to_r_g_b_a({0xFFB5B5, 0.80})}
+    local fontgauge = opts.fontgauge or {size = 8}
+
+    local colorpfill = {{0, 61/255, 115/255, 218/255, 0.5}, {1, 61/255, 115/255, 218/255, 1}}
+    local colorpline = nil
+    local colorpbg   = {{0, 1, 1, 1, 0.05}}
+
+    local colorpsfill = {{0, 1, 0, 0, 0.6}, {1, 1, 0, 0, 1.0}}
+    local colorpsline = nil
+    local colorpsbg   = nil
+
+    local colortitle = opts.colortitle or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fonttitle  = opts.fonttitle  or {face = "ubuntu", size = 20, weight = bgh_bold()}
+    local colorload  = opts.colorload  or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fontload2  = opts.fontload2  or {face = "ubuntu", size = 12, weight = bgh_bold()}
+
+    local colorlbl   = opts.colorlbl
+    local fontlbl    = opts.fontlbl  or {face = "ubuntu", size = 12, weight = bgh_bold()}
+    local fontlbls   = opts.fontlbls or {face = "ubuntu", size = 8, weight = bgh_bold()}
+
+    local colorleg   = opts.colorleg
+    local fontleg    = opts.fontleg  or {face = "ubuntu", size = 8}
+
+    local colortop   = opts.colortop or {1, 1, 1, 0.5}
+    local fonttop    = opts.fonttop  or {face = "monospace", size = 10}
+
+    --================================================================= IO USAGE
+    posx = posx + radiuso
+    posy = posy + radiuso
+
+    local radius = radiuso - widtho / 2
+    local rinc = widtho + iso
+
+    local disks  = opts.disks
+    local dnames = opts.dnames
+    if opts.disks == nil or opts.dnames == nil then
+        disks, dnames = bgh_filesystems()
+    end
+
+    for i, fs in pairs(disks) do
+        local ro = bgh_ogauge:newarc(0, 100, posx, posy, radius - rinc * (i - 1), angles, anglef, widtho, widthtip, colorbg, colorfg, colorstip, colorstxt, fontgauge)
+        ro._upfunc = function() return bgh_conky("fs_used_perc " .. fs), bgh_conky("fs_used " .. fs) end
+        table.insert(ros, ro)
+
+        -- the labels
+        if dnames[i] ~= nil then
+            local txt = bgh_otext:new(dnames[i], posx, posy + radius - rinc * (i - 1), "rc", fontleg, colorleg)
+            table.insert(ros, txt)
+        end
+    end
+
+
+    --=============================================================== DISKS TEMP
+    local radius = radiusi - widthi / 2
+    local rinc = widthi + isi
+
+    -- a dummy ro to parse the temperatures
+    local bgh_dummy = bgh_dummy:new()
+    function bgh_dummy:tick()
+        self.temps = bgh_hddtemps()
+    end
+
+    table.insert(ros, bgh_dummy)
+
+    local hddtemps = opts.hddtemps
+    local tnames   = opts.tnames
+    if hddtemps == nil or tnames == nil then
+        hddtemps, tnames = bgh_hddtemp_disks()
+    end
+
+    for i, val in pairs(hddtemps) do
+        local ro = bgh_ogauge:newarc(0, 105, posx, posy, radiusi - rinc * (i-1), angles, anglef, widthi, widthtip, colorbg, colorfg, colorstip, colorstxt, fontgauge)
+
+        ro._upfunc = function()
+            return bgh_dummy.temps[val], bgh_dummy.temps[val]
+        end
+        ro._drawme = function()
+            if bgh_dummy.temps[val] ~= nil then return true end
+            return false
+        end
+        table.insert(ros, ro)
+
+        -- the labels
+        if tnames[i] ~= nil then
+            local txt = bgh_otext:new(tnames[i], posx, posy + radiusi - rinc * (i - 1), "rc", fontleg, colorleg)
+            txt._drawme = function()
+                if bgh_dummy.temps[val] ~= nil then return true end
+            return false
+        end
+            table.insert(ros, txt)
+        end
+    end
+
+
+
+    --======================================================= IO READ/WRITE PLOT
+    posx = posx + sepx
+    posy = posy - radiuso
+
+    -- READ/WRITE
+    local ror = bgh_oplot:new(nil, nil, plotw, ploth / 2 , posx, posy, colorpfill, colorpline, colorpbg, true, nil)
+    local row = bgh_oplot:new(nil, nil, plotw, ploth / 2 , posx, posy + ploth / 2, colorpfill, colorpline, colorpbg, true, true)
+    ror._upfunc = function() return bgh_log(bgh_htb(bgh_conky("diskio_read"))) end
+    row._upfunc = function() return bgh_log(bgh_htb(bgh_conky("diskio_write"))) end
+    table.insert(ros, bgh_syncplot:new(ror, row)) -- sync the scale
+
+    -- texts
+    local txt = bgh_otext:new("IO", posx + 10, posy + ploth / 2, "lc", fonttitle, colortitle)
+    table.insert(ros, txt)
+
+    local txtr = bgh_otext:new("", posx + plotw - 10, posy + ploth / 4, "rc", fontload2, colorload)
+    local txtw = bgh_otext:new("", posx + plotw - 10, posy + ploth * 3 / 4, "rc", fontload2, colorload)
+    txtr._upfunc = function() return bgh_conky("diskio_read") end
+    txtw._upfunc = function() return bgh_conky("diskio_write") end
+    table.insert(ros, txtr)
+    table.insert(ros, txtw)
+
+    if #hddtemps > 0 then
+        local txt = bgh_otext:new("°C", posx - sepx, posy + radiuso, "rc", fontlbl, colorlbl)
+        table.insert(ros, txt)
+    end
+
+    --================================================================== CPU TOP
+    posy = posy + radiuso * 2 - 11 * 9
+    bgh_tmerge(ros, bgw_conkytop("%15s %7s %4s",   "top_io", {"name", "io_read", "io_write"}, posx, posy, 11, 9, fonttop, colortop))
+
+    return ros
+end
+
+--========================================================
+--=================================================== NICS
+--========================================================
+function bgw_nics(opts)
+    local opts = opts or {}
+    local ros = {}
+
+    -- defaults
+    local posx    = opts.posx    or 15 + 70 + 5
+    local posy    = opts.posy    or 5 + (70*2+15) * 3 + 70
+
+    local sepnic  = opts.sepnic  or 10
+    local plotw   = opts.plotw   or 210
+    local ploth   = opts.ploth   or 35
+
+    -- colors and font
+    local colorpfill = {{0, 61/255, 115/255, 218/255, 0.5}, {1, 61/255, 115/255, 218/255, 1}}
+    local colorpline = nil
+    local colorpbg   = {{0, 1, 1, 1, 0.05}}
+
+    local colorpsfill = {{0, 1, 0, 0, 0.6}, {1, 1, 0, 0, 1.0}}
+    local colorpsline = nil
+    local colorpsbg   = nil
+
+    local colortitle = opts.colortitle or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fonttitle2 = opts.fonttitle2 or {face = "ubuntu", size = 16, weight = bgh_bold()}
+    local colorload  = opts.colorload  or bgh_rgba_to_r_g_b_a({0xbbcae5, 0.8})
+    local fontload2  = opts.fontload2  or {face = "ubuntu", size = 12, weight = bgh_bold()}
+    local fontload3  = opts.fontload3  or {face = "ubuntu", size = 12, weight = bgh_bold()}
+
+
+
+    --===================================================== NICS READ/WRITE PLOT
+    local nics = opts.nics or bgh_nics()
+
+    local gnics = bgh_grouplist:new(0, ploth + sepnic)
+
+    for i, nic in pairs(nics) do
+        local gnic = {}
+
+        -- READ/WRITE
+        local ror = bgh_oplot:new(nil, nil, plotw, ploth / 2 , posx, posy, colorpfill, colorpline, colorpbg, true, nil)
+        local row = bgh_oplot:new(nil, nil, plotw, ploth / 2 , posx, posy + ploth / 2, colorpfill, colorpline, colorpbg, true, true)
+        ror._upfunc = function() return bgh_log(bgh_htb(bgh_conky("downspeed " .. nic))) end
+        row._upfunc = function() return bgh_log(bgh_htb(bgh_conky("upspeed " .. nic))) end
+        table.insert(gnic, bgh_syncplot:new(ror, row)) -- sync the scale
+
+        -- texts
+        local txtr = bgh_otext:new(nic, posx + 10, posy + ploth / 4, "lc", fonttitle2, colorload)
+        local txtw = bgh_otext:new("", posx + 10, posy + ploth * 3 / 4, "lc", fontload3, colorload)
+        txtw._upfunc = function() local state, ip = bgh_nicstate(nic) return ip end
+        table.insert(gnic, txtr)
+        table.insert(gnic, txtw)
+
+        local txtr = bgh_otext:new("", posx + plotw - 10, posy + ploth / 4, "rc", fontload2, colorload)
+        local txtw = bgh_otext:new("", posx + plotw - 10, posy + ploth * 3 / 4, "rc", fontload2, colorload)
+        txtr._upfunc = function() return bgh_conky("downspeed " .. nic) end
+        txtw._upfunc = function() return bgh_conky("upspeed " .. nic) end
+        table.insert(gnic, txtr)
+        table.insert(gnic, txtw)
+
+        gnic._drawme = function()
+            local state, ip = bgh_nicstate(nic)
+            if state == "UP" then return true end
+            return false
+        end
+
+        gnics:addgroup(gnic)
+    end
+    table.insert(ros, gnics)
+
+
+    return ros
+end
+
+--========================================================
+--==================================================== TOP
+--========================================================
+function bgw_conkytop(format, cmd, params, posx, posy, yinc, nolines, font, color)
+    format  = format  or "%15s %4s%% %4s"
+    cmd     = cmd     or "top"
+    params  = params  or {"name", "cpu", "mem_res"}
+    nolines = nolines or 5
+    yinc    = yinc    or 10
+    color   = color   or {1, 1, 1, 0.5}
+
+    posx = posx or 10
+    posy = posy or 150
+
+    -- init render objects
+    ros = {}
+    for i = 1, nolines, 1 do
+        local ro = bgh_otext:new("", posx, posy + yinc * i, nil, font, color)
+
+        local conkyies = {}
+        for j, val in pairs(params) do
+            table.insert(conkyies, cmd .. ' ' .. val .. ' ' .. i)
+        end
+
+        ro._upfunc = function(format, conkyies)
+            local params = {}
+            for j, val in pairs(conkyies) do
+                table.insert(params, bgh_conky(val))
+            end
+
+            return bgh_fstring(format, unpack(params))
+        end
+        ro._upparams = {format, conkyies}
+
+        table.insert(ros, ro)
+    end
+
+    return ros
+end
+
+--========================================================
+--============================================== BACKGROUD
+--========================================================
+function bgw_background(opts)
+    local opts = opts or {}
+
+    local posx       = opts.bgx
+    local posy       = opts.bgy
+
+    local width      = opts.bgw
+    local height     = opts.bgh
+
+    local background = opts.background
+
+    if background ~= nil then
+        return {bgh_oplot:new(1, 1, width, height, posx, posy, nil, nil, background)}
+    end
+    return {}
+end
+
