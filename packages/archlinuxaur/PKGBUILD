@@ -1,0 +1,23 @@
+# Maintainer: Noeljnuior <liamgliam @ gmail.com>
+
+pkgname=conky-bargile
+pkgver=1.7
+pkgrel=2
+pkgdesc="A Top conky-lua for ArchLinux"
+arch=('any')
+url="https://github.com/Noeljunior/conky-bargile"
+license=('GPL')
+depends=('conky-lua' 'lm_sensors' 'hddtemp' 'git')
+source=("$pkgname::git+https://github.com/Noeljunior/conky-bargile")
+#install="${pkgname}.install"
+md5sums=('SKIP')
+#backup=('etc/conky/conky-top.conf' 'usr/share/conkytop/gmail.pl' 'usr/share/conkytop/update.pl' )
+
+package() {
+	cd $srcdir/$pkgname
+
+    ./configure "/etc/conky" "/usr/share/${pkgname}"
+	make install BINDIR="${pkgdir}/usr/bin" CONFDIR="${pkgdir}/etc/conky" USRDIR="${pkgdir}/usr/share/${pkgname}"
+}
+
+

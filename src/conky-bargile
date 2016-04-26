@@ -1,0 +1,3 @@
+#!/bin/bash
+
+conky --config '/etc/conky/conky-bargile.conf'
